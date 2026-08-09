@@ -1,12 +1,11 @@
 """PunchRecord model and database operations."""
 
 from typing import Optional
-import psycopg2.extras
 
 
 def get_latest_punch(conn, user_id: str) -> Optional[dict]:
     """Get the most recent punch record for a user."""
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute(
             """SELECT * FROM punch_records
                WHERE user_id = %s
@@ -26,7 +25,7 @@ def create_punch_record(
     gps_accuracy_m: float,
 ) -> dict:
     """Insert a new punch record."""
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute(
             """INSERT INTO punch_records (user_id, type, latitude, longitude, gps_accuracy_m, created_at)
                VALUES (%s, %s, %s, %s, %s, NOW())
@@ -39,7 +38,7 @@ def create_punch_record(
 
 def get_user_punches(conn, user_id: str, start_date: str, end_date: str) -> list:
     """Get punch records for a user within a date range."""
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute(
             """SELECT * FROM punch_records
                WHERE user_id = %s
@@ -53,7 +52,7 @@ def get_user_punches(conn, user_id: str, start_date: str, end_date: str) -> list
 
 def get_all_punches_in_range(conn, start_date: str, end_date: str) -> list:
     """Get all punch records within a date range (for admin reports)."""
-    with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+    with conn.cursor() as cur:
         cur.execute(
             """SELECT pr.*, u.name as user_name, u.email as user_email
                FROM punch_records pr

@@ -1,9 +1,9 @@
 """Database connection pool management."""
 
 import os
-import psycopg2
-from psycopg2 import pool
 from dotenv import load_dotenv
+from psycopg.rows import dict_row
+from psycopg_pool import ConnectionPool
 
 load_dotenv()
 
@@ -17,27 +17,25 @@ def get_pool():
     """Get or create the database connection pool."""
     global _connection_pool
     if _connection_pool is None:
-        _connection_pool = pool.SimpleConnectionPool(
-            minconn=1,
-            maxconn=5,
-            dsn=DATABASE_URL,
+        _connection_pool = ConnectionPool(
+            conninfo=DATABASE_URL,
+            min_size=1,
+            max_size=5,
+            kwargs={"row_factory": dict_row},
         )
     return _connection_pool
 
 
 def get_db():
-    """Get a database connection from the pool. Use as a context manager."""
-    db_pool = get_pool()
-    conn = db_pool.getconn()
-    try:
+    """Get a database connection from the pool."""
+    pool = get_pool()
+    with pool.connection() as conn:
         yield conn
-    finally:
-        db_pool.putconn(conn)
 
 
 def close_pool():
     """Close all connections in the pool. Call on app shutdown."""
     global _connection_pool
     if _connection_pool is not None:
-        _connection_pool.closeall()
+        _connection_pool.close()
         _connection_pool = None

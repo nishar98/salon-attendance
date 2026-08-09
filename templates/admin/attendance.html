@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Attendance Records — Salon Attendance{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold text-gray-800 mb-6">Attendance Records</h1>
+
+<!-- User selector -->
+<div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+    <div class="flex flex-wrap items-center gap-4">
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">Associate</label>
+            <select id="user-select" class="border rounded-lg px-3 py-2 text-sm min-w-[200px]">
+                <option value="">Select a user...</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">From</label>
+            <input type="date" id="att-start" class="border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-xs text-gray-500 mb-1">To</label>
+            <input type="date" id="att-end" class="border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div class="self-end">
+            <button onclick="loadAttendance()" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
+                View
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div id="summary-cards" class="hidden grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Days Present</p>
+        <p id="days-present" class="text-2xl font-bold text-green-600">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Total Hours</p>
+        <p id="total-hours" class="text-2xl font-bold text-indigo-600">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Avg Hours/Day</p>
+        <p id="avg-hours" class="text-2xl font-bold text-gray-700">-</p>
+    </div>
+</div>
+
+<!-- Records table -->
+<div class="bg-white rounded-xl shadow-sm p-4">
+    <div id="attendance-content">
+        <p class="text-gray-500 text-center py-8">Select a user and date range to view attendance.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Load users on page load
+    loadUsers();
+    setDefaultDates();
+
+    async function loadUsers() {
+        const res = await fetch('/api/admin/users');
+        if (!res.ok) return;
+        const data = await res.json();
+        const select = document.getElementById('user-select');
+        for (const u of data.users) {
+            if (u.role === 'associate') {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = u.name;
+                select.appendChild(opt);
+            }
+        }
+    }
+
+    function setDefaultDates() {
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        document.getElementById('att-start').value = firstDay.toISOString().split('T')[0];
+        document.getElementById('att-end').value = now.toISOString().split('T')[0];
+    }
+
+    async function loadAttendance() {
+        const userId = document.getElementById('user-select').value;
+        const start = document.getElementById('att-start').value;
+        const end = document.getElementById('att-end').value;
+        const content = document.getElementById('attendance-content');
+        const summaryCards = document.getElementById('summary-cards');
+
+        if (!userId) {
+            content.innerHTML = '<p class="text-red-500 text-center py-4">Please select a user.</p>';
+            return;
+        }
+
+        content.innerHTML = '<p class="text-gray-500 text-center py-4">Loading...</p>';
+
+        const res = await fetch(`/api/admin/users/${userId}/attendance?start=${start}&end=${end}`);
+        if (!res.ok) {
+            content.innerHTML = '<p class="text-red-500 text-center py-4">Failed to load attendance.</p>';
+            summaryCards.classList.add('hidden');
+            return;
+        }
+
+        const data = await res.json();
+
+        // Update summary cards
+        summaryCards.classList.remove('hidden');
+        document.getElementById('days-present').textContent = data.days_present;
+        document.getElementById('total-hours').textContent = data.total_hours + 'h';
+        const avg = data.days_present > 0 ? (data.total_hours / data.days_present).toFixed(1) : '0';
+        document.getElementById('avg-hours').textContent = avg + 'h';
+
+        if (!data.records || data.records.length === 0) {
+            content.innerHTML = '<p class="text-gray-500 text-center py-8">No records for this period.</p>';
+            return;
+        }
+
+        let html = `
+            <h3 class="text-sm font-medium text-gray-600 mb-3">${data.user_name} — Attendance</h3>
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b text-left text-gray-500">
+                        <th class="py-2">Date</th>
+                        <th class="py-2">Punch In</th>
+                        <th class="py-2">Punch Out</th>
+                        <th class="py-2">Hours</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+        for (const row of data.records) {
+            const hoursClass = row.hours === 'In Progress' ? 'text-green-600 font-medium' : '';
+            html += `
+                <tr class="border-b last:border-0">
+                    <td class="py-2">${row.date}</td>
+                    <td class="py-2">${row.punch_in || '-'}</td>
+                    <td class="py-2">${row.punch_out || '-'}</td>
+                    <td class="py-2 ${hoursClass}">${row.hours || '-'}</td>
+                </tr>`;
+        }
+
+        html += '</tbody></table>';
+        content.innerHTML = html;
+    }
+</script>
+{% endblock %}

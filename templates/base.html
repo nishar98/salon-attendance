@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4f46e5">
+    <title>{% block title %}Salon Attendance{% endblock %}</title>
+    <!-- TailwindCSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-gray-50 min-h-screen">
+    {% block navbar %}
+    {% if user %}
+    <nav class="bg-white shadow-sm border-b sticky top-0 z-50">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <a href="/" class="text-lg font-semibold text-indigo-600">Salon Attendance</a>
+
+            <!-- Desktop nav -->
+            <div class="hidden sm:flex items-center gap-4">
+                {% if user.role == 'admin' %}
+                <a href="/admin/dashboard" class="text-sm text-gray-600 hover:text-indigo-600">Dashboard</a>
+                <a href="/admin/attendance" class="text-sm text-gray-600 hover:text-indigo-600">Attendance</a>
+                <a href="/admin/users" class="text-sm text-gray-600 hover:text-indigo-600">Users</a>
+                <a href="/admin/geofence" class="text-sm text-gray-600 hover:text-indigo-600">Geofence</a>
+                {% else %}
+                <a href="/" class="text-sm text-gray-600 hover:text-indigo-600">Home</a>
+                <a href="/history" class="text-sm text-gray-600 hover:text-indigo-600">History</a>
+                {% endif %}
+                <button onclick="logout()" class="text-sm text-red-500 hover:text-red-700">Logout</button>
+            </div>
+
+            <!-- Mobile hamburger -->
+            <button id="menu-toggle" class="sm:hidden p-2 rounded-lg hover:bg-gray-100" onclick="toggleMenu()">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Mobile menu -->
+        <div id="mobile-menu" class="hidden sm:hidden border-t bg-white px-4 py-3 space-y-2">
+            {% if user.role == 'admin' %}
+            <a href="/admin/dashboard" class="block text-sm text-gray-600 py-2">Dashboard</a>
+            <a href="/admin/attendance" class="block text-sm text-gray-600 py-2">Attendance</a>
+            <a href="/admin/users" class="block text-sm text-gray-600 py-2">Users</a>
+            <a href="/admin/geofence" class="block text-sm text-gray-600 py-2">Geofence</a>
+            {% else %}
+            <a href="/" class="block text-sm text-gray-600 py-2">Home</a>
+            <a href="/history" class="block text-sm text-gray-600 py-2">History</a>
+            {% endif %}
+            <button onclick="logout()" class="block text-sm text-red-500 py-2 w-full text-left">Logout</button>
+        </div>
+    </nav>
+    {% endif %}
+    {% endblock %}
+
+    <!-- Toast notification container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-[100] space-y-2 pointer-events-none"></div>
+
+    <main class="max-w-4xl mx-auto px-4 py-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script>
+        // Mobile menu toggle
+        function toggleMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
+
+        // Logout
+        async function logout() {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login';
+        }
+
+        // Toast notification helper (available globally)
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'pointer-events-auto px-4 py-3 rounded-lg shadow-lg text-sm max-w-xs transform transition-all duration-300 translate-x-full';
+
+            if (type === 'success') {
+                toast.classList.add('bg-green-600', 'text-white');
+            } else if (type === 'error') {
+                toast.classList.add('bg-red-600', 'text-white');
+            } else {
+                toast.classList.add('bg-gray-800', 'text-white');
+            }
+
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-x-full');
+                toast.classList.add('translate-x-0');
+            });
+
+            // Auto remove
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
+
+        // Global fetch wrapper that handles network errors
+        window.safeFetch = async function(url, options = {}) {
+            try {
+                const res = await fetch(url, options);
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return null;
+                }
+                return res;
+            } catch (err) {
+                showToast('Network error. Check your connection.', 'error');
+                return null;
+            }
+        }
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

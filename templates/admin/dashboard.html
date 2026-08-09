@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — Salon Attendance{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold text-gray-800 mb-6">Dashboard</h1>
+
+<!-- Today's summary cards -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Present Today</p>
+        <p id="present-count" class="text-3xl font-bold text-green-600">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Absent Today</p>
+        <p id="absent-count" class="text-3xl font-bold text-red-500">-</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-sm text-gray-500">Active Now</p>
+        <p id="active-count" class="text-3xl font-bold text-indigo-600">-</p>
+    </div>
+</div>
+
+<!-- Weekly chart -->
+<div class="bg-white rounded-xl shadow-sm p-4 mb-8">
+    <h2 class="text-sm font-medium text-gray-600 mb-3">This Week</h2>
+    <canvas id="weekly-chart" height="200"></canvas>
+</div>
+
+<!-- Today's detail table -->
+<div class="bg-white rounded-xl shadow-sm p-4">
+    <h2 class="text-sm font-medium text-gray-600 mb-3">Today's Attendance</h2>
+    <div id="today-table">
+        <p class="text-gray-500 text-center py-4">Loading...</p>
+    </div>
+</div>
+
+<!-- CSV Export -->
+<div class="mt-6 bg-white rounded-xl shadow-sm p-4">
+    <h2 class="text-sm font-medium text-gray-600 mb-3">Export</h2>
+    <div class="flex flex-wrap items-center gap-3">
+        <input type="date" id="export-start" class="border rounded-lg px-3 py-2 text-sm">
+        <span class="text-gray-400">to</span>
+        <input type="date" id="export-end" class="border rounded-lg px-3 py-2 text-sm">
+        <a id="export-link" href="#" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700">
+            Download CSV
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/charts.js"></script>
+{% endblock %}

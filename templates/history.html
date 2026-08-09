@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Attendance History — Salon Attendance{% endblock %}
+
+{% block content %}
+<h1 class="text-xl font-semibold text-gray-800 mb-4">Attendance History</h1>
+
+<!-- Month selector -->
+<div class="flex items-center gap-3 mb-4">
+    <label class="text-sm text-gray-600">Month:</label>
+    <input type="month" id="month-select" class="border rounded-lg px-3 py-2 text-sm">
+</div>
+
+<!-- Records table -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div id="history-content" class="p-4">
+        <p class="text-gray-500 text-center">Loading...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const monthInput = document.getElementById('month-select');
+    const content = document.getElementById('history-content');
+
+    // Default to current month
+    const now = new Date();
+    monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    monthInput.addEventListener('change', loadHistory);
+    loadHistory();
+
+    async function loadHistory() {
+        const [year, month] = monthInput.value.split('-');
+        const start = `${year}-${month}-01`;
+        const endDate = new Date(year, month, 1); // first of next month
+        const end = endDate.toISOString().split('T')[0];
+
+        try {
+            const res = await fetch(`/api/punch/history?start=${start}&end=${end}`);
+            if (!res.ok) {
+                content.innerHTML = '<p class="text-red-500 text-center">Failed to load history.</p>';
+                return;
+            }
+            const data = await res.json();
+
+            if (!data.records || data.records.length === 0) {
+                content.innerHTML = '<p class="text-gray-500 text-center py-8">No records for this month.</p>';
+                return;
+            }
+
+            let html = `
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b text-left text-gray-500">
+                            <th class="py-2">Date</th>
+                            <th class="py-2">In</th>
+                            <th class="py-2">Out</th>
+                            <th class="py-2">Hours</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+            for (const row of data.records) {
+                html += `
+                    <tr class="border-b last:border-0">
+                        <td class="py-2">${row.date}</td>
+                        <td class="py-2">${row.punch_in || '-'}</td>
+                        <td class="py-2">${row.punch_out || '<span class="text-green-600">In Progress</span>'}</td>
+                        <td class="py-2">${row.hours || '-'}</td>
+                    </tr>`;
+            }
+
+            html += '</tbody></table>';
+            content.innerHTML = html;
+        } catch (err) {
+            content.innerHTML = '<p class="text-red-500 text-center">Network error.</p>';
+        }
+    }
+</script>
+{% endblock %}

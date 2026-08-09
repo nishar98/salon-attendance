@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Home — Salon Attendance{% endblock %}
+
+{% block content %}
+<div class="text-center mt-8">
+    <h1 class="text-xl font-semibold text-gray-800 mb-2">Welcome back!</h1>
+
+    <!-- Status display -->
+    <div id="status-display" class="mb-8">
+        <p id="status-text" class="text-gray-500 text-lg">Loading status...</p>
+        <p id="elapsed-time" class="text-sm text-gray-400 mt-1"></p>
+    </div>
+
+    <!-- Punch button -->
+    <button id="punch-btn" onclick="doPunch()" disabled
+            class="w-48 h-48 rounded-full text-white text-xl font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 bg-gray-400">
+        Loading...
+    </button>
+
+    <!-- Messages -->
+    <div id="message" class="mt-6 hidden px-4 py-3 rounded-lg text-sm max-w-sm mx-auto"></div>
+
+    <!-- GPS status -->
+    <p id="gps-status" class="text-xs text-gray-400 mt-4"></p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/punch.js"></script>
+{% endblock %}

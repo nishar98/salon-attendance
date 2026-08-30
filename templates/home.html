@@ -2,26 +2,36 @@
 {% block title %}Home — Salon Attendance{% endblock %}
 
 {% block content %}
-<div class="text-center mt-8">
-    <h1 class="text-xl font-semibold text-gray-800 mb-2">Welcome back!</h1>
-
-    <!-- Status display -->
-    <div id="status-display" class="mb-8">
-        <p id="status-text" class="text-gray-500 text-lg">Loading status...</p>
+<div class="max-w-md mx-auto mt-6">
+    <!-- Status card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center mb-6">
+        <div id="status-icon" class="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <p id="status-text" class="text-lg font-semibold text-gray-400">Loading...</p>
         <p id="elapsed-time" class="text-sm text-gray-400 mt-1"></p>
     </div>
 
     <!-- Punch button -->
-    <button id="punch-btn" onclick="doPunch()" disabled
-            class="w-48 h-48 rounded-full text-white text-xl font-bold shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 bg-gray-400">
-        Loading...
-    </button>
+    <div class="flex justify-center mb-6">
+        <button id="punch-btn" onclick="doPunch()" disabled
+                class="w-44 h-44 rounded-full text-white text-xl font-bold shadow-xl transition-all transform hover:scale-105 active:scale-95 disabled:opacity-50 bg-gray-300 flex items-center justify-center">
+            <span class="flex flex-col items-center gap-1">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span id="punch-label">Loading...</span>
+            </span>
+        </button>
+    </div>
 
-    <!-- Messages -->
-    <div id="message" class="mt-6 hidden px-4 py-3 rounded-lg text-sm max-w-sm mx-auto"></div>
+    <!-- Message -->
+    <div id="message" class="hidden rounded-xl text-sm px-4 py-3 mb-4"></div>
 
-    <!-- GPS status -->
-    <p id="gps-status" class="text-xs text-gray-400 mt-4"></p>
+    <!-- GPS info -->
+    <p id="gps-status" class="text-xs text-gray-400 text-center"></p>
 </div>
 {% endblock %}
 

@@ -9,14 +9,13 @@ from pydantic import BaseModel
 from models.database import get_db
 from models.user import get_all_users, create_user, update_user_status, get_user_by_email
 from models.site import get_site, update_site
-from models.punch import get_all_punches_in_range, get_user_punches
+from models.punch import get_all_punches_in_range, get_user_punches, get_open_sessions, get_latest_punch
 from services.auth import hash_password
+from services.timezone import now_ist, to_ist, format_time_ist, format_date_ist, today_ist_range, ist_date_str, IST
 from routes.dependencies import require_admin
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
-
-# --- Pydantic models ---
 
 class CreateUserRequest(BaseModel):
     name: str
@@ -34,29 +33,23 @@ class UpdateGeofenceRequest(BaseModel):
     radius_m: int
 
 
-# --- Endpoints ---
-
 @router.get("/users")
 def list_users(user=Depends(require_admin), conn=Depends(get_db)):
-    """List all users (admin only)."""
     users = get_all_users(conn)
     return {"users": [dict(u) for u in users]}
 
 
 @router.post("/users")
 def add_user(body: CreateUserRequest, user=Depends(require_admin), conn=Depends(get_db)):
-    """Create a new associate (admin only)."""
     name = body.name.strip()
     email = body.email.strip().lower()
     password = body.password
 
     if not name or not email or not password:
         return JSONResponse(status_code=400, content={"detail": "All fields are required."})
-
     if len(password) < 8:
         return JSONResponse(status_code=400, content={"detail": "Password must be at least 8 characters."})
 
-    # Check for duplicate email
     existing = get_user_by_email(conn, email)
     if existing:
         return JSONResponse(status_code=409, content={"detail": "A user with this email already exists."})
@@ -68,61 +61,41 @@ def add_user(body: CreateUserRequest, user=Depends(require_admin), conn=Depends(
 
 @router.put("/users/{user_id}/status")
 def change_user_status(user_id: str, body: UpdateStatusRequest, user=Depends(require_admin), conn=Depends(get_db)):
-    """Activate or deactivate a user."""
     if body.status not in ("active", "inactive"):
         return JSONResponse(status_code=400, content={"detail": "Status must be 'active' or 'inactive'."})
-
     update_user_status(conn, user_id, body.status)
     return {"message": f"User status set to {body.status}."}
 
 
 @router.get("/geofence")
 def get_geofence(user=Depends(require_admin), conn=Depends(get_db)):
-    """Get current geofence configuration."""
     site = get_site(conn)
     if not site:
         return JSONResponse(status_code=404, content={"detail": "Site not configured."})
-    return {
-        "latitude": float(site["latitude"]),
-        "longitude": float(site["longitude"]),
-        "radius_m": site["radius_m"],
-        "name": site["name"],
-    }
+    return {"latitude": float(site["latitude"]), "longitude": float(site["longitude"]), "radius_m": site["radius_m"], "name": site["name"]}
 
 
 @router.put("/geofence")
 def update_geofence(body: UpdateGeofenceRequest, user=Depends(require_admin), conn=Depends(get_db)):
-    """Update geofence coordinates and radius."""
     if not (-90 <= body.latitude <= 90) or not (-180 <= body.longitude <= 180):
         return JSONResponse(status_code=400, content={"detail": "Invalid coordinates."})
-
     if not (5 <= body.radius_m <= 50):
         return JSONResponse(status_code=400, content={"detail": "Radius must be between 5 and 50 metres."})
-
     updated = update_site(conn, body.latitude, body.longitude, body.radius_m)
-    return {
-        "latitude": float(updated["latitude"]),
-        "longitude": float(updated["longitude"]),
-        "radius_m": updated["radius_m"],
-    }
+    return {"latitude": float(updated["latitude"]), "longitude": float(updated["longitude"]), "radius_m": updated["radius_m"]}
 
 
 @router.get("/dashboard")
 def dashboard_data(user=Depends(require_admin), conn=Depends(get_db)):
-    """Get dashboard summary data."""
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    today_end = today_start + timedelta(days=1)
+    """Get dashboard summary data. All times in IST."""
+    today_start, today_end = today_ist_range()
 
-    # Get all users
     users = get_all_users(conn)
     active_users = [u for u in users if u["status"] == "active" and u["role"] == "associate"]
 
-    # Get today's punch records
     today_punches = get_all_punches_in_range(conn, today_start.isoformat(), today_end.isoformat())
 
-    # Who punched in today?
     users_who_punched_in = set()
-    active_sessions = set()
     user_first_punch = {}
 
     for p in today_punches:
@@ -132,33 +105,35 @@ def dashboard_data(user=Depends(require_admin), conn=Depends(get_db)):
             if uid not in user_first_punch:
                 user_first_punch[uid] = p["server_timestamp"]
 
-    # Determine who's currently on duty (last punch is 'in')
+    # Determine who's CURRENTLY active (check latest punch globally, not just today)
+    active_sessions = set()
     for u in active_users:
         uid = str(u["id"])
-        user_punches = [p for p in today_punches if str(p["user_id"]) == uid]
-        if user_punches:
-            # Punches are sorted DESC from the query, so first is latest
-            if user_punches[0]["type"] == "in":
+        latest = get_latest_punch(conn, uid)
+        if latest and latest["type"] == "in":
+            # Check it's from today (IST)
+            punch_ist = to_ist(latest["server_timestamp"])
+            if punch_ist >= today_start:
                 active_sessions.add(uid)
 
     present_today = len(users_who_punched_in)
     absent_today = len(active_users) - present_today
     active_now = len(active_sessions)
 
-    # Today's details
     today_details = []
     for u in active_users:
         uid = str(u["id"])
         status = "Present" if uid in users_who_punched_in else "Absent"
         punch_in_time = user_first_punch.get(uid)
+        is_active = uid in active_sessions
         today_details.append({
             "name": u["name"],
-            "status": status,
-            "punch_in": punch_in_time.strftime("%I:%M %p") if punch_in_time else None,
+            "status": "Active" if is_active else status,
+            "punch_in": format_time_ist(punch_in_time),
             "hours": None,
         })
 
-    # Weekly data (last 7 days)
+    # Weekly data (last 7 days in IST)
     weekly = []
     for i in range(6, -1, -1):
         day_start = today_start - timedelta(days=i)
@@ -182,14 +157,12 @@ def dashboard_data(user=Depends(require_admin), conn=Depends(get_db)):
 
 @router.get("/users/{user_id}/attendance")
 def user_attendance(user_id: str, start: str = None, end: str = None, user=Depends(require_admin), conn=Depends(get_db)):
-    """Get attendance records for a specific user (admin only)."""
+    """Get attendance records for a specific user. All times in IST."""
     from models.user import get_user_by_id
 
-    # Default to current month
     if not start or not end:
-        now = datetime.now(timezone.utc)
+        now = now_ist()
         start = now.replace(day=1).strftime("%Y-%m-%d")
-        # Next month's first day
         if now.month == 12:
             end = f"{now.year + 1}-01-01"
         else:
@@ -201,25 +174,23 @@ def user_attendance(user_id: str, start: str = None, end: str = None, user=Depen
 
     records = get_user_punches(conn, user_id, start, end)
 
-    # Group by date into sessions
     sessions = {}
     for r in records:
-        day = r["server_timestamp"].strftime("%Y-%m-%d")
+        day = ist_date_str(r["server_timestamp"])
         if day not in sessions:
-            sessions[day] = {"date": r["server_timestamp"].strftime("%b %d, %Y"), "in": None, "out": None}
+            sessions[day] = {"date": format_date_ist(r["server_timestamp"], include_year=True), "in": None, "out": None}
 
         if r["type"] == "in" and sessions[day]["in"] is None:
             sessions[day]["in"] = r["server_timestamp"]
         elif r["type"] == "out" and sessions[day]["out"] is None:
             sessions[day]["out"] = r["server_timestamp"]
 
-    # Format for frontend
     result = []
     total_hours = 0
     for day_key in sorted(sessions.keys(), reverse=True):
         s = sessions[day_key]
-        punch_in = s["in"].strftime("%I:%M %p") if s["in"] else None
-        punch_out = s["out"].strftime("%I:%M %p") if s["out"] else None
+        punch_in = format_time_ist(s["in"])
+        punch_out = format_time_ist(s["out"])
         hours = None
         if s["in"] and s["out"]:
             diff = (s["out"] - s["in"]).total_seconds() / 3600
